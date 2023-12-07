@@ -1,0 +1,8 @@
+You can download the dataset below.
+https://downloads.psl.noaa.gov/Datasets/livneh/metvars/
+Within this repository, the variables are abbreviated as follows:
+• 'prec' for daily total gridded precipitation
+• 'wind' for surface wind speed
+• 'tmin' for surface daily minimum air temperature
+• 'tmax' for surface daily maximum air temperature
+From 2010 to 2011.
