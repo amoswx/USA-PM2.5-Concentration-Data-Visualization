@@ -1,0 +1,713 @@
+options(shiny.maxRequestSize=30*1024^2)
+
+library(tidyverse)
+library(geojsonio)
+library(leaflet)
+library(dplyr)
+library(IDDA)
+library(maps)
+library(sp)
+library(htmlwidgets)
+library(lubridate)
+library(shiny)
+library(ncdf4)
+library(reshape2)
+library(mapdata)
+library(sp)
+library(rgeos)
+library(ggplot2)
+library(ggmap)
+library(sf)
+library(spData)
+library(raster)
+library(rasterVis)
+data=read.csv('data.csv')[ ,-1]
+df_prec_2010=read.csv('df_prec_2010.csv')[ ,-1]
+df_prec_2011=read.csv('df_prec_2011.csv')[ ,-1]
+df_wind_2010=read.csv('df_wind_2010.csv')[ ,-1]
+df_wind_2011=read.csv('df_wind_2011.csv')[ ,-1]
+df_tmax_2010=read.csv('df_tmax_2010.csv')[ ,-1]
+df_tmax_2011=read.csv('df_tmax_2011.csv')[ ,-1]
+df_tmin_2010=read.csv('df_tmin_2010.csv')[ ,-1]
+df_tmin_2011=read.csv('df_tmin_2011.csv')[ ,-1]
+df_prec=rbind(df_prec_2010,df_prec_2011)
+df_wind=rbind(df_wind_2010,df_wind_2011)
+df_tmax=rbind(df_tmax_2010,df_tmax_2011)
+df_tmin=rbind(df_tmin_2010,df_tmin_2011)
+data=data%>%
+  mutate(Date=gsub('([0-9]{2})/([0-9]{2})/([0-9]{4})', '\\3-\\1-\\2', Date))%>%
+  left_join(df_prec%>%select(3,5,7),by=c('STATE','Date'))%>%
+  left_join(df_wind%>%select(3,5,7),by=c('STATE','Date'))%>%
+  left_join(df_tmax%>%select(3,5,7),by=c('STATE','Date'))%>%
+  left_join(df_tmin%>%select(3,5,7),by=c('STATE','Date'))
+
+
+ncname <- "prec.2010"
+readnc_prec_2010 <- expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_prec_2010)
+prec_2010 <- x
+ncname <- "prec.2011"
+readnc_prec_2011 <- expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_prec_2011)
+prec_2011 <- x
+
+ncname <- "wind.2010" 
+readnc_wind_2010=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_wind_2010)
+wind_2010 <- x
+
+ncname <- "wind.2011" 
+readnc_wind_2011=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_wind_2011)
+wind_2011 <- x
+
+ncname <- "tmax.2010" 
+readnc_tmax_2010=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_tmax_2010)
+tmax_2010 <- x
+
+ncname <- "tmax.2011" 
+readnc_tmax_2011=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_tmax_2011)
+tmax_2011 <- x
+
+ncname <- "tmin.2010" 
+readnc_tmin_2010=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_tmin_2010)
+tmin_2010 <- x
+
+ncname <- "tmin.2011" 
+readnc_tmin_2011=expression({
+  ncfname <- paste0(ncname, ".nc");
+  ncin <- nc_open(ncfname);
+  x <- ncvar_get(ncin);
+  lat <- ncvar_get(ncin, "lat");
+  lon <- ncvar_get(ncin, "lon");
+})
+eval(readnc_tmin_2011)
+tmin_2011 <- x
+
+data2=data%>%
+  group_by(STATE,Date)%>%
+  mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+  filter(!is.na(Mean_precipitation))%>%
+  slice(1)
+p=data2%>%
+  ggplot(aes(x = Mean_precipitation, y = Mean_PM2.5))+
+  geom_point()+
+  geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+data2=data%>%
+  group_by(STATE,Date)%>%
+  mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+  filter(!is.na(Mean_wind))%>%
+  slice(1)
+w=data2%>%
+  ggplot(aes(x = Mean_wind, y = Mean_PM2.5))+
+  geom_point()+
+  geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+data2=data%>%
+  group_by(STATE,Date)%>%
+  mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+  filter(!is.na(Mean_tmax))%>%
+  slice(1)
+t1=data2%>%
+  ggplot(aes(x = Mean_tmax, y = Mean_PM2.5))+
+  geom_point()+
+  geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+data2=data%>%
+  group_by(STATE,Date)%>%
+  mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+  filter(!is.na(Mean_tmin))%>%
+  slice(1)
+t2=data2%>%
+  ggplot(aes(x = Mean_tmin, y = Mean_PM2.5))+
+  geom_point()+
+  geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+
+daily_map= function(date){
+  data1=data%>%
+    filter(Date==as.character(date))%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+    slice(1)
+  
+  urlRemote  <- "https://raw.githubusercontent.com/"
+  pathGithub <- "PublicaMundi/MappingAPI/master/data/geojson/"
+  fileName   <- "us-states.json"
+  df1=geojson_read(x = paste0(urlRemote, pathGithub, fileName), 
+                   what = "sp")
+  data1=data1%>%
+    mutate(STATE=ifelse(STATE=="District Of Columbia","District of Columbia",STATE))
+  df2=df1%>%
+    subset(name %in% unique(data1$STATE))
+  df2@data=df2@data%>%
+    left_join(data1%>%select(1,16,25,26),by=c('name'='STATE'))
+  
+  color.bins <- colorBin("YlOrRd", domain = data1$Mean_PM2.5, bins = quantile (data1$Mean_PM2.5, probs = seq(0, 1, 0.2)))
+  
+  map.state <- function(dat, fill.var, labels, pal, ID){
+    dmap <- leaflet(dat) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addTiles() %>%
+      addPolygons(
+        fillColor = ~pal(dat@data %>% pull(fill.var)),
+        weight = 1, opacity = 1, color = "white",
+        dashArray = "3", fillOpacity = 0.9,
+        layerId = ~dat@data %>% pull(ID),
+        highlight = highlightOptions(
+          weight = 5, color = "#666", dashArray = NULL,
+          fillOpacity = 0.9, bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto")) %>%
+      addLegend(pal = pal, values = ~dat@data %>% 
+                  pull(fill.var), opacity = 0.7, title = NULL, bin=6,
+                position = "bottomright")
+    dmap
+  }
+  labels_cases <- sprintf(
+    "<strong>%s</strong><br/>
+        Date: %s<br>
+        API Value: %g<br>
+        Daily Mean PM2.5 Concentration: %g<br>",
+    data1$STATE, 
+    data1$Date, 
+    data1$Mean_API_Value, 
+    data1$Mean_PM2.5) %>% 
+    lapply(htmltools::HTML)
+  
+  map.state(dat = df2, fill.var = 'Mean_PM2.5', labels = labels_cases, pal = color.bins, ID = 'name')
+  
+}
+
+prec_map_State=function(date){
+  data1=data%>%
+    filter(Date==as.character(date))%>%
+    filter(!is.na(Mean_precipitation))%>%
+    group_by(STATE,Date)%>%
+    slice(1)
+  
+  urlRemote  <- "https://raw.githubusercontent.com/"
+  pathGithub <- "PublicaMundi/MappingAPI/master/data/geojson/"
+  fileName   <- "us-states.json"
+  df1=geojson_read(x = paste0(urlRemote, pathGithub, fileName), 
+                   what = "sp")
+  df2=df1%>%
+    subset(name %in% unique(data1$STATE))
+  df2@data=df2@data%>%
+    left_join(data1%>%select(1,16,21),by=c('name'='STATE'))
+  
+  bin1=(quantile(data1$Mean_precipitation, probs = seq(0, 1, 0.2)))
+  bin2=(quantile(data1$Mean_precipitation, probs = seq(0, 1, 0.25)))
+  if (as.numeric(bin1[2])==0){
+    color.bins <- colorBin("PuBu", domain = data1$Mean_precipitation, 
+                           bins = bin2)
+  }else {
+    color.bins <- colorBin("PuBu", domain = data1$Mean_precipitation, 
+                           bins = bin1)
+  }
+  
+  map.state <- function(dat, fill.var, labels, pal, ID){
+    dmap <- leaflet(dat) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addTiles() %>%
+      addPolygons(
+        fillColor = ~pal(dat@data %>% pull(fill.var)),
+        weight = 1, opacity = 1, color = "white",
+        dashArray = "3", fillOpacity = 0.9,
+        layerId = ~dat@data %>% pull(ID),
+        highlight = highlightOptions(
+          weight = 5, color = "#666", dashArray = NULL,
+          fillOpacity = 0.9, bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto")) %>%
+      addLegend(pal = pal, values = ~dat@data %>% 
+                  pull(fill.var), opacity = 0.7, title = NULL, bin=6,
+                position = "bottomright")
+    dmap
+  }
+  
+  labels_cases <- sprintf(
+    "<strong>%s</strong><br/>
+        Date: %s<br>
+        Mean_precipitation: %g<br>",
+    data1$STATE, 
+    data1$Date, 
+    data1$Mean_precipitation) %>% 
+    lapply(htmltools::HTML)
+  
+  map.state(dat = df2, fill.var = 'Mean_precipitation', labels = labels_cases, pal = color.bins, ID = 'name')
+  
+}
+
+wind_map_State=function(date){
+  data1=data%>%
+    filter(Date==as.character(date))%>%
+    filter(!is.na(Mean_wind))%>%
+    group_by(STATE,Date)%>%
+    slice(1)
+  
+  urlRemote  <- "https://raw.githubusercontent.com/"
+  pathGithub <- "PublicaMundi/MappingAPI/master/data/geojson/"
+  fileName   <- "us-states.json"
+  df1=geojson_read(x = paste0(urlRemote, pathGithub, fileName), 
+                   what = "sp")
+  df2=df1%>%
+    subset(name %in% unique(data1$STATE))
+  df2@data=df2@data%>%
+    left_join(data1%>%select(1,16,22),by=c('name'='STATE'))
+  
+  bin1=(quantile(data1$Mean_wind, probs = seq(0, 1, 0.2)))
+  bin2=(quantile(data1$Mean_wind, probs = seq(0, 1, 0.25)))
+  if (as.numeric(bin1[2])==0){
+    color.bins <- colorNumeric(palette = "BuGn", domain =  data1$Mean_wind
+                               , n = 5)
+  }else {
+    color.bins <- colorBin("BuGn", domain = data1$Mean_wind, 
+                           bins = bin1)
+  }
+  
+  map.state <- function(dat, fill.var, labels, pal, ID){
+    dmap <- leaflet(dat) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addTiles() %>%
+      addPolygons(
+        fillColor = ~pal(dat@data %>% pull(fill.var)),
+        weight = 1, opacity = 1, color = "white",
+        dashArray = "3", fillOpacity = 0.9,
+        layerId = ~dat@data %>% pull(ID),
+        highlight = highlightOptions(
+          weight = 5, color = "#666", dashArray = NULL,
+          fillOpacity = 0.9, bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto")) %>%
+      addLegend(pal = pal, values = ~dat@data %>% 
+                  pull(fill.var), opacity = 0.7, title = NULL, bin=6,
+                position = "bottomright")
+    dmap
+  }
+  
+  labels_cases <- sprintf(
+    "<strong>%s</strong><br/>
+        Date: %s<br>
+        Mean_precipitation: %g<br>",
+    data1$STATE, 
+    data1$Date, 
+    data1$Mean_wind) %>% 
+    lapply(htmltools::HTML)
+  
+  map.state(dat = df2, fill.var = 'Mean_wind', labels = labels_cases, pal = color.bins, ID = 'name')
+  
+}
+
+tmin_map_State=function(date){
+  data1=data%>%
+    filter(Date==as.character(date))%>%
+    filter(!is.na(Mean_tmin))%>%
+    group_by(STATE,Date)%>%
+    slice(1)
+  
+  urlRemote  <- "https://raw.githubusercontent.com/"
+  pathGithub <- "PublicaMundi/MappingAPI/master/data/geojson/"
+  fileName   <- "us-states.json"
+  df1=geojson_read(x = paste0(urlRemote, pathGithub, fileName), 
+                   what = "sp")
+  df2=df1%>%
+    subset(name %in% unique(data1$STATE))
+  df2@data=df2@data%>%
+    left_join(data1%>%select(1,16,24),by=c('name'='STATE'))
+  
+  bin1=(quantile(data1$Mean_tmin, probs = seq(0, 1, 0.2)))
+  bin2=(quantile(data1$Mean_tmin, probs = seq(0, 1, 0.25)))
+  if (as.numeric(bin1[2])==0){
+    color.bins <- colorNumeric(palette = "Blues", domain =  data1$Mean_tmin
+                               , n = 5)
+  }else {
+    color.bins <- colorBin("Blues", domain = data1$Mean_tmin, 
+                           bins = bin1)
+  }
+  
+  map.state <- function(dat, fill.var, labels, pal, ID){
+    dmap <- leaflet(dat) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addTiles() %>%
+      addPolygons(
+        fillColor = ~pal(dat@data %>% pull(fill.var)),
+        weight = 1, opacity = 1, color = "white",
+        dashArray = "3", fillOpacity = 0.9,
+        layerId = ~dat@data %>% pull(ID),
+        highlight = highlightOptions(
+          weight = 5, color = "#666", dashArray = NULL,
+          fillOpacity = 0.9, bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto")) %>%
+      addLegend(pal = pal, values = ~dat@data %>% 
+                  pull(fill.var), opacity = 0.7, title = NULL, bin=6,
+                position = "bottomright")
+    dmap
+  }
+  
+  labels_cases <- sprintf(
+    "<strong>%s</strong><br/>
+        Date: %s<br>
+        Mean_precipitation: %g<br>",
+    data1$STATE, 
+    data1$Date, 
+    data1$Mean_tmin) %>% 
+    lapply(htmltools::HTML)
+  
+  map.state(dat = df2, fill.var = 'Mean_tmin', labels = labels_cases, pal = color.bins, ID = 'name')
+  
+}
+
+tmax_map_State=function(date){
+  data1=data%>%
+    filter(Date==as.character(date))%>%
+    filter(!is.na(Mean_tmax))%>%
+    group_by(STATE,Date)%>%
+    slice(1)
+  
+  urlRemote  <- "https://raw.githubusercontent.com/"
+  pathGithub <- "PublicaMundi/MappingAPI/master/data/geojson/"
+  fileName   <- "us-states.json"
+  df1=geojson_read(x = paste0(urlRemote, pathGithub, fileName), 
+                   what = "sp")
+  df2=df1%>%
+    subset(name %in% unique(data1$STATE))
+  df2@data=df2@data%>%
+    left_join(data1%>%select(1,16,23),by=c('name'='STATE'))
+  
+  bin1=(quantile(data1$Mean_tmax, probs = seq(0, 1, 0.2)))
+  bin2=(quantile(data1$Mean_tmax, probs = seq(0, 1, 0.25)))
+  if (as.numeric(bin1[2])==0){
+    color.bins <- colorNumeric(palette = "OrRd", domain =  data1$Mean_tmax
+                               , n = 5)
+  }else {
+    color.bins <- colorBin("OrRd", domain = data1$Mean_tmax, 
+                           bins = bin1)
+  }
+  
+  map.state <- function(dat, fill.var, labels, pal, ID){
+    dmap <- leaflet(dat) %>%
+      setView(-96, 37.8, zoom = 4) %>%
+      addTiles() %>%
+      addPolygons(
+        fillColor = ~pal(dat@data %>% pull(fill.var)),
+        weight = 1, opacity = 1, color = "white",
+        dashArray = "3", fillOpacity = 0.9,
+        layerId = ~dat@data %>% pull(ID),
+        highlight = highlightOptions(
+          weight = 5, color = "#666", dashArray = NULL,
+          fillOpacity = 0.9, bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto")) %>%
+      addLegend(pal = pal, values = ~dat@data %>% 
+                  pull(fill.var), opacity = 0.7, title = NULL, bin=6,
+                position = "bottomright")
+    dmap
+  }
+  
+  labels_cases <- sprintf(
+    "<strong>%s</strong><br/>
+        Date: %s<br>
+        Mean_precipitation: %g<br>",
+    data1$STATE, 
+    data1$Date, 
+    data1$Mean_tmax) %>% 
+    lapply(htmltools::HTML)
+  
+  map.state(dat = df2, fill.var = 'Mean_tmax', labels = labels_cases, pal = color.bins, ID = 'name')
+  
+}
+
+prec_map_Site=function(date){
+  date=as.Date(date)
+  lenth1=as.numeric(date-as.Date('2009-12-31'))
+  lenth2=as.numeric(date-as.Date('2010-12-31'))
+  date=as.character(date)
+  
+  
+  if (substr(date, start = 1, stop = 4) == '2010'){
+    
+    
+    # plot total gridded precipitation on 01-01-2010
+    # source code from https://rpubs.com/boyerag/297592
+    slice_2010_prec <- prec_2010[ , , lenth1]
+    
+    
+    r_2010_prec <- raster(t(slice_2010_prec), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +datum=WGS84"))
+    
+    r_2010_prec <- flip(r_2010_prec, direction='y')
+    plot_output <- plot(r_2010_prec)
+    return(plot_output)
+    
+  }
+  
+  else{
+    slice_2011_prec <- prec_2011[ , , lenth2]
+    r_2011_prec <- raster(t(slice_2011_prec), xmn=min(lon), xmx=max(lon),
+                          ymn=min(lat), ymx=max(lat),
+                          crs=CRS("+proj=longlat +datum=WGS84"))
+    r_2011_prec <- flip(r_2011_prec, direction='y')
+    
+    plot_output <- plot(r_2011_prec)
+    return(plot_output)
+    
+  }
+}
+
+prec_pm2.5_map= function(date){
+  data1=data%>%
+    mutate(Date=gsub('([0-9]{2})/([0-9]{2})/([0-9]{4})', '\\3-\\1-\\2', Date))%>%
+    filter(Date==as.character(date))%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    mutate(Mean_PM2.5=mean(Daily.Mean.PM2.5.Concentration))%>%
+    slice(1)
+}
+
+prec_smooth=function(date){
+  data2=data%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    filter(!is.na(Mean_precipitation))%>%
+    slice(1)
+  data2%>%
+    ggplot(aes(x = Mean_precipitation, y = Mean_API_Value))+
+    geom_point()+
+    geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+}
+
+wind_smooth=function(date){
+  data2=data%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    filter(!is.na(Mean_wind))%>%
+    slice(1)
+  data2%>%
+    ggplot(aes(x = Mean_wind, y = Mean_API_Value))+
+    geom_point()+
+    geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+}
+
+tmax_smooth=function(date){
+  data2=data%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    filter(!is.na(Mean_tmax))%>%
+    slice(1)
+  data2%>%
+    ggplot(aes(x = Mean_tmax, y = Mean_API_Value))+
+    geom_point()+
+    geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+}
+
+tmin_smooth=function(date){
+  data2=data%>%
+    group_by(STATE,Date)%>%
+    mutate(Mean_API_Value=mean(DAILY_AQI_VALUE))%>%
+    filter(!is.na(Mean_tmin))%>%
+    slice(1)
+  data2%>%
+    ggplot(aes(x = Mean_tmin, y = Mean_API_Value))+
+    geom_point()+
+    geom_smooth(method = "loess", se=F,size=1.2, color="red",linetype = "dashed")
+}
+
+wind_map <- function(date){
+  date=as.Date(date)
+  lenth1=as.numeric(date-as.Date('2009-12-31'))
+  lenth2=as.numeric(date-as.Date('2010-12-31'))
+  date=as.character(date)
+  
+  if (substr(date, start = 1, stop = 4) == '2010'){
+    
+    
+    # plot total gridded wind on certain date
+    slice_2010_wind <- wind_2010[ , , lenth1]
+    
+    
+    r_2010_wind <- raster(t(slice_2010_wind), xmn=min(lon), xmx=max(lon), ymn=min(lat), 
+                          ymx=max(lat), crs=CRS("+proj=longlat +datum=WGS84"))
+    
+    r_2010_wind <- flip(r_2010_wind, direction='y')
+    plot_output <- plot(r_2010_wind)
+    return(plot_output)
+    
+  }
+  
+  else{
+    
+    slice_2011_wind <- wind_2011[ , , lenth2]
+    r_2011_wind <- raster(t(slice_2011_wind), xmn=min(lon), xmx=max(lon),
+                          ymn=min(lat), ymx=max(lat),
+                          crs=CRS("+proj=longlat +datum=WGS84"))
+    r_2011_wind <- flip(r_2011_wind, direction='y')
+    
+    plot_output <- plot(r_2011_wind)
+    return(plot_output)
+    
+  }
+}
+
+tmax_map <- function(date){
+  date=as.Date(date)
+  lenth1=as.numeric(date-as.Date('2009-12-31'))
+  lenth2=as.numeric(date-as.Date('2010-12-31'))
+  date=as.character(date)
+  if (substr(date, start = 1, stop = 4) == '2010'){
+    
+    # plot total gridded tmax on certain date
+    slice_2010_tmax <- tmax_2010[ , , lenth1]
+    
+    
+    r_2010_tmax <- raster(t(slice_2010_tmax), xmn=min(lon), xmx=max(lon), ymn=min(lat), 
+                          ymx=max(lat), crs=CRS("+proj=longlat +datum=WGS84"))
+    
+    r_2010_tmax <- flip(r_2010_tmax, direction='y')
+    plot_output <- plot(r_2010_tmax)
+    return(plot_output)
+    
+  }
+  
+  else{
+    slice_2011_tmax <- tmax_2011[ , , lenth2]
+    r_2011_tmax <- raster(t(slice_2011_tmax), xmn=min(lon), xmx=max(lon),
+                          ymn=min(lat), ymx=max(lat),
+                          crs=CRS("+proj=longlat +datum=WGS84"))
+    r_2011_tmax <- flip(r_2011_tmax, direction='y')
+    
+    plot_output <- plot(r_2011_tmax)
+    return(plot_output)
+    
+  }
+}
+
+tmin_map <- function(date){
+  date=as.Date(date)
+  lenth1=as.numeric(date-as.Date('2009-12-31'))
+  lenth2=as.numeric(date-as.Date('2010-12-31'))
+  date=as.character(date)
+  
+  if (substr(date, start = 1, stop = 4) == '2010'){
+    # plot total gridded tmin on certain date
+    slice_2010_tmin <- tmin_2010[ , , lenth1]
+    
+    
+    r_2010_tmin <- raster(t(slice_2010_tmin), xmn=min(lon), xmx=max(lon), ymn=min(lat), 
+                          ymx=max(lat), crs=CRS("+proj=longlat +datum=WGS84"))
+    
+    r_2010_tmin <- flip(r_2010_tmin, direction='y')
+    plot_output <- plot(r_2010_tmin)
+    return(plot_output)
+    
+  }
+  
+  else{
+    slice_2011_tmin <- tmin_2011[ , , lenth2]
+    r_2011_tmin <- raster(t(slice_2011_tmin), xmn=min(lon), xmx=max(lon),
+                          ymn=min(lat), ymx=max(lat),
+                          crs=CRS("+proj=longlat +datum=WGS84"))
+    r_2011_tmin <- flip(r_2011_tmin, direction='y')
+    
+    plot_output <- plot(r_2011_tmin)
+    return(plot_output)
+    
+  }
+}
+
+
+shinyServer(function(input, output){
+  
+  output$daily_map <- renderLeaflet({
+    mymap = daily_map(input$Date)
+  })
+  output$prec_map <- renderPlot({
+    prec=prec_map_Site(input$Date)
+  })
+  output$prec_map_State <- renderLeaflet({
+    mymap2 = prec_map_State(input$Date)
+  })
+  output$prec_smooth <- renderPlot({
+    p
+  })
+  output$wind_map <- renderPlot({
+    wind <- wind_map(input$Date)
+  })
+  output$wind_map_State <- renderLeaflet({
+    mymap2 = wind_map_State(input$Date)
+  })
+  output$wind_smooth <- renderPlot({
+    w
+  })
+  output$tmax_map <- renderPlot({
+    tmax <- tmax_map(input$Date)
+  })
+  output$tmax_map_State <- renderLeaflet({
+    mymap2 = tmax_map_State(input$Date)
+  })
+  output$tmax_smooth <- renderPlot({
+    t1
+  }) 
+  output$tmin_map <- renderPlot({
+    tmin <- tmin_map(input$Date)
+  })
+  output$tmin_map_State <- renderLeaflet({
+    mymap2 = tmin_map_State(input$Date)
+  })
+  output$tmin_smooth <- renderPlot({
+    t2
+  })
+})
